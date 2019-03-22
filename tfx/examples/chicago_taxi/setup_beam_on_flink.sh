@@ -31,12 +31,14 @@ FLINK_VERSION="1.5.6"
 FLINK_NAME="flink-$FLINK_VERSION"
 FLINK_BINARY="$FLINK_NAME-bin-scala_2.11.tgz"
 FLINK_DOWNLOAD_URL="http://archive.apache.org/dist/flink/flink-$FLINK_VERSION/$FLINK_BINARY"
+# task manager heap config in conf/flink-conf.yaml
+FLINK_TASKMANGER_HEAP_FIELD="taskmanager.heap.mb"
+FLINK_TASKMANGER_HEAP_VALUE="10240"
 
 echo "Setup Beam from source code at $BEAM_REPO Branch $BEAM_BRANCH"
 echo "Using work directory $WORK_DIR"
 
 
-# TODO(BEAM-2530): Update the check to Java 11 once Beam support Java 11.
 function check_java() {
   if type -p java; then
     _java=java
@@ -77,6 +79,14 @@ function update_beam(){
   fi
 }
 
+function create_docker(){
+  echo "Building a docker container with user sepcified requirement $USER_REQUIREMENTS."
+  cd $BEAM_DIR
+  ./gradlew :beam-sdks-python-container:docker
+  ./sdks/python/scripts/add_requirements.sh
+  echo "Docker build finished."
+}
+
 function setup_flink() {
   if [ $SETUP_FLINK == 1 ]; then
     if [ ! -d $WORK_DIR/$FLINK_NAME ]; then
@@ -94,6 +104,19 @@ function setup_flink() {
       echo "FLINK SETUP DONE at $WORK_DIR/$FLINK_NAME"
     fi
   fi
+}
+
+function update_taskmanager_heap() {
+  echo "Updating Flink taskmanager heap."
+  cd $WORK_DIR/$FLINK_NAME
+  grep "$FLINK_TASKMANGER_HEAP_FIELD: [0-9]\+" conf/flink-conf.yaml
+  if [ $? != 0 ]; then
+    echo "ERROR: Unable to update taskmanager heap, Please check taskmanager " \
+         "heap config in conf/flink-conf.yaml."
+    exit 1
+  fi
+  sed -i -r "s/$FLINK_TASKMANGER_HEAP_FIELD: [0-9]+/$FLINK_TASKMANGER_HEAP_FIELD: $FLINK_TASKMANGER_HEAP_VALUE/1" conf/flink-conf.yaml
+  echo "Flink taskmanager heap updated."
 }
 
 function start_flink() {
@@ -118,7 +141,11 @@ function main(){
     echo "Please delete $WORK_DIR in case of issue."
     update_beam
   fi
+  if [ ! -z "$USER_REQUIREMENTS" ]; then
+    create_docker
+  fi
   setup_flink
+  update_taskmanager_heap
   start_flink
   start_job_server
 }
