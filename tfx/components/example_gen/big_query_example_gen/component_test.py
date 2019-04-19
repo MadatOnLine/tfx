@@ -48,6 +48,21 @@ class ComponentTest(tf.test.TestCase):
     self.assertEqual('eval', artifact_collection[1].split)
     self.assertEqual('test', artifact_collection[2].split)
 
+  def test_construct_with_input_config(self):
+    big_query_example_gen = component.BigQueryExampleGen(
+        query='',
+        input_config=example_gen_pb2.Input(splits=[
+            example_gen_pb2.Input.Split(name='train', pattern='query1'),
+            example_gen_pb2.Input.Split(name='eval', pattern='query2'),
+            example_gen_pb2.Input.Split(name='test', pattern='query3')
+        ]))
+    self.assertEqual('ExamplesPath',
+                     big_query_example_gen.outputs.examples.type_name)
+    artifact_collection = big_query_example_gen.outputs.examples.get()
+    self.assertEqual('train', artifact_collection[0].split)
+    self.assertEqual('eval', artifact_collection[1].split)
+    self.assertEqual('test', artifact_collection[2].split)
+
 
 if __name__ == '__main__':
   tf.test.main()
