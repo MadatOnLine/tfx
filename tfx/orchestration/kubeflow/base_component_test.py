@@ -52,7 +52,7 @@ class BaseComponentTest(tf.test.TestCase):
           pipeline_properties=self._pipeline_properties,
       )
 
-  def test_container_op_arguments(self):
+  def testContainerOpArguments(self):
     self.assertEqual(self.component.container_op.arguments[0],
                      '--exec_properties')
     self.assertDictEqual(
@@ -76,9 +76,15 @@ class BaseComponentTest(tf.test.TestCase):
         '0.3',
     ])
 
-  def test_container_op_output_parameters(self):
+  def testContainerOpOutputParameters(self):
     self.assertEqual(self.component.container_op.file_outputs,
                      {'output_name': '/output/ml_metadata/output_name'})
+
+  def testDefaultImage(self):
+    self.assertEqual('tensorflow/tfx:0.13.0rc1',
+                     base_component._default_image('0.13.0rc1'))
+    self.assertEqual('tensorflow/tfx:latest',
+                     base_component._default_image('non-existing-tag'))
 
 
 if __name__ == '__main__':

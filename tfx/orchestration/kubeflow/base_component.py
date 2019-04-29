@@ -30,15 +30,41 @@ import json
 from kfp import dsl
 from kfp import gcp
 from kubernetes import client as k8s_client
+import requests
+
 from tfx import version
 from tfx.utils import types
 
 
-# Default TFX container image to use in Kubeflow. Overrideable by 'tfx_image'
-# pipeline property.
-# TODO(ajaygopinathan): Update with final image location.
-_KUBEFLOW_TFX_IMAGE = 'gcr.io/cloud-ml-pipelines-test/tfx-kubeflow:%s' % (
-    version.__version__)
+def _find_image_tag(tfx_version):
+  """Find best suited image tag for a tfx version.
+
+  If given version has been published to Docker hub, return the same version
+  as tag. This is usually the case for any RC or release.
+  Otherwise, uses 'latest' image tag.
+
+  Args:
+    tfx_version: version string of tfx.
+
+  Returns:
+    Same version tag if it is published to Docker Hub, otherwise 'latest'.
+  """
+  resp = requests.get(
+      'https://hub.docker.com/v2/repositories/tensorflow/tfx/tags/')
+  if resp != 200:
+    return tfx_version
+  resp_dict = json.loads(resp.text)
+  tag_names = [tag['name'] for tag in resp_dict['results']]
+  if tfx_version in tag_names:
+    return tfx_version
+  return 'latest'
+
+
+def _default_image(tfx_version):
+  """Returns the default image if not specified by user."""
+  return 'tensorflow/tfx:' % (_find_image_tag(tfx_version))
+
+
 _COMMAND = [
     'python', '/tfx-src/tfx/orchestration/kubeflow/container_entrypoint.py'
 ]
@@ -58,7 +84,7 @@ class PipelineProperties(object):
     ])
     if beam_pipeline_args:
       self.exec_properties['beam_pipeline_args'] = beam_pipeline_args
-    self.tfx_image = tfx_image or _KUBEFLOW_TFX_IMAGE
+    self.tfx_image = tfx_image or _default_image(version.__version__)
 
 
 class BaseComponent(object):
